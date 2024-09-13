@@ -147,13 +147,15 @@ const VideoPlayer = ({ callback, title, reference }) => {
 
   useEffect(() => {
     scrollToTop()
+    setShowControls(false)
     // if (isIOS() || isSafari()) {
     //   setShowControls(true);
     // } else {
     // }
-    playVideo()
+    // playVideo()
     return () => {
       clearInterval(intervalRef.current)
+      setShowControls(false)
     }
   }, [])
 
@@ -747,15 +749,6 @@ const VideoPlayer = ({ callback, title, reference }) => {
           isPlaying={isPlaying}
         />
       )}
-      {/* <video
-          ref={videoRef}
-          id="video"
-          crossOrigin="anonymous"
-          playsInline
-          style={{display: "none"}}
-        >
-          <source src={file} />
-        </video> */}
       <div
         className="vis cursor-grab"
         ref={mount}

@@ -22,7 +22,7 @@ const VideoControls = ({
   const timer = useRef(null)
 
   return (
-    <div className="bg-black bg-opacity-60 absolute w-screen h-screen z-10 flex items-center justify-center flex-col">
+    <div className="bg-black bg-opacity-60 absolute w-screen h-screen z-10 flex items-center justify-center flex-col top-0">
       <div className="text-white w-full md:w-3/4 lg:w-1/2 flex justify-center items-center relative flex-col px-4">
         {!isPlaying ? (
           <>
