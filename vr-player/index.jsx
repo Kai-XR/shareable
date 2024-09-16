@@ -827,7 +827,7 @@ const VRPlayer = ({ callback, videoData, showPlayer }) => {
                       className="bg-black/50 rounded-full py-3 px-3 items-center justify-center absolute bottom-[120px] left-[-43px] -rotate-90 hidden"
                       ref={volumeRange}
                     >
-                      <div className="absolute top-[18px] left-[16px] w-[80%] h-1 bg-white/30 z-0"></div>
+                      <div className="absolute top-[23px] left-[16px] w-[80%] h-1 bg-white/30 z-0"></div>
                       <input
                         type="range"
                         min="0"
