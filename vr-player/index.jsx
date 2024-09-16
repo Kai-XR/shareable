@@ -773,7 +773,7 @@ const VRPlayer = ({ callback, videoData, showPlayer }) => {
             <VideoControls
               playVideo={playVideo}
               pauseVideo={pauseVideo}
-              title={videoData?.title}
+              videoTitle={videoData?.title}
               mediaDuration={videoRef.current.duration}
               progress={videoProgress}
               seekAudio={seekAudio}
