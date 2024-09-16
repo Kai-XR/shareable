@@ -60,15 +60,17 @@ const scrollToTop = () => {
   })
 }
 
-const VideoPlayer = ({ callback, title, reference }) => {
+const VRPlayer = ({ callback, videoData, showPlayer }) => {
   let width = 0
   let height = 0
   const windowWidth = useRef(null)
   const windowHeight = useRef(null)
   const windowOrientation = useRef(null)
   const volumeRange = useRef(null)
-  const [volume, setVolume] = useState(100 * reference.current.volume)
-  const [muted, setMuted] = useState(reference.current.muted)
+  // const [volume, setVolume] = useState(100 * videoRef.current.volume)
+  // const [muted, setMuted] = useState(videoRef.current.muted)
+  const [volume, setVolume] = useState(100)
+  const [muted, setMuted] = useState(false)
   const firstResize = useRef(true)
 
   const [isPlaying, setIsPlaying] = useState(false)
@@ -83,7 +85,7 @@ const VideoPlayer = ({ callback, title, reference }) => {
   const [showControlsOnClick] = useState(true)
 
   const mount = useRef(null)
-  //const videoRef = useRef(reference);
+  const videoRef = useRef(null)
   const intervalRef = useRef()
   const intervalVolumeRef = useRef()
   const videoContainer = useRef(null)
@@ -108,7 +110,7 @@ const VideoPlayer = ({ callback, title, reference }) => {
       pauseButton.visible = true
       cursorButton.visible = true
     } else {
-      //reference.current.pause();
+      //videoRef.current.pause();
       pauseButton.visible = false
       cursorButton.visible = false
       material1.opacity = 1
@@ -130,7 +132,7 @@ const VideoPlayer = ({ callback, title, reference }) => {
   const startTimer = () => {
     clearInterval(intervalRef.current)
     intervalRef.current = setInterval(() => {
-      setVideoProgress(reference.current.currentTime)
+      setVideoProgress(videoRef.current.currentTime)
     }, 1000)
   }
 
@@ -147,27 +149,30 @@ const VideoPlayer = ({ callback, title, reference }) => {
 
   useEffect(() => {
     scrollToTop()
-    setShowControls(false)
+    // setShowControls(false)
     // if (isIOS() || isSafari()) {
     //   setShowControls(true);
     // } else {
     // }
     // playVideo()
+
     return () => {
       clearInterval(intervalRef.current)
-      setShowControls(false)
+      // setShowControls(false)
     }
   }, [])
 
   useEffect(() => {
-    isInteractedRef.current = isInteracted
-    if (firstRun) {
-      firstRun = false
-      return
+    if (showPlayer) {
+      isInteractedRef.current = isInteracted
+      if (firstRun) {
+        firstRun = false
+        return
+      }
+      if (!isInteracted) tweenOut.start()
+      else tweenIn.start()
     }
-    if (!isInteracted) tweenOut.start()
-    else tweenIn.start()
-  }, [isInteracted])
+  }, [isInteracted, showPlayer])
 
   useEffect(() => {
     showControlsOnClickRef.current = showControlsOnClick
@@ -178,236 +183,253 @@ const VideoPlayer = ({ callback, title, reference }) => {
   }, [is360])
 
   useEffect(() => {
-    if (window.innerWidth > window.innerHeight) {
-      windowOrientation.current = 'landscape'
-      windowWidth.current = window.innerHeight
-      windowHeight.current = window.innerWidth
-    } else {
-      windowOrientation.current = 'portrait'
-      windowWidth.current = window.innerWidth
-      windowHeight.current = window.innerHeight
-    }
-    updatePlayerControls = true
-    // width = mount.current.clientWidth;
-    // height = mount.current.clientHeight;
+    if (showPlayer && videoData) {
+      videoRef.current.src = videoData.video_source
+      videoRef.current.currentTime = 0
+      if (videoData.autoplay) {
+        videoRef.current.play()
+      } else {
+        videoRef.current.pause()
+      }
+      setShowControls(!videoData.autoplay)
 
-    //RAYCASTER
-    raycaster = new THREE.Raycaster()
+      if (window.innerWidth > window.innerHeight) {
+        windowOrientation.current = 'landscape'
+        windowWidth.current = window.innerHeight
+        windowHeight.current = window.innerWidth
+      } else {
+        windowOrientation.current = 'portrait'
+        windowWidth.current = window.innerWidth
+        windowHeight.current = window.innerHeight
+      }
+      updatePlayerControls = true
+      // width = mount.current.clientWidth;
+      // height = mount.current.clientHeight;
 
-    // scene
-    scene = new THREE.Scene()
-    scene.background = new THREE.Color(0x101010)
+      //RAYCASTER
+      raycaster = new THREE.Raycaster()
 
-    // camera
-    camera = new THREE.PerspectiveCamera(
-      80,
-      window.innerWidth / window.innerHeight,
-      0.1,
-      1000
-    )
-    camera.layers.enable(1) // render left view when no stereo available
+      // scene
+      scene = new THREE.Scene()
+      scene.background = new THREE.Color(0x101010)
 
-    // video
-    const video = reference.current
-    const texture = new THREE.VideoTexture(video)
-
-    // left
-    const geometry1 = new THREE.SphereGeometry(500, 60, 40)
-
-    // invert the geometry on the x-axis so that all of the faces point inward
-    geometry1.scale(-1, 1, 1)
-
-    geometry1.rotateY(-Math.PI / 2)
-
-    material1 = new THREE.MeshBasicMaterial({
-      map: texture,
-      transparent: true,
-    })
-
-    const mesh1 = new THREE.Mesh(geometry1, material1)
-    //mesh1.rotation.y = -Math.PI / 2;
-    mesh1.layers.set(1) // display in left eye only
-    scene.add(mesh1)
-
-    // right
-
-    const geometry2 = new THREE.SphereGeometry(500, 60, 40)
-    geometry2.scale(-1, 1, 1)
-    geometry2.rotateY(-Math.PI / 2)
-    material2 = new THREE.MeshBasicMaterial({
-      map: texture,
-      transparent: true,
-    })
-
-    const mesh2 = new THREE.Mesh(geometry2, material2)
-    //mesh2.rotation.y = -Math.PI / 2;
-    mesh2.layers.set(2) // display in right eye only
-    scene.add(mesh2)
-
-    // renderer
-
-    renderer = new THREE.WebGLRenderer({ alpha: true })
-    renderer.setPixelRatio(window.devicePixelRatio)
-    renderer.setSize(window.innerWidth, window.innerHeight)
-    renderer.xr.enabled = true
-    renderer.xr.setReferenceSpaceType('local')
-    renderer.autoClear = true
-    mount.current.appendChild(renderer.domElement)
-
-    pauseButton = new THREE.Group()
-    pauseButton.position.set(0, 0, -1)
-    const geometry = new THREE.PlaneGeometry(0.75, 0.75)
-
-    const textureButton = new THREE.TextureLoader().load(Pause)
-
-    const material = new THREE.MeshBasicMaterial({
-      transparent: true,
-      map: textureButton,
-    })
-    material.map.encoding = THREE.sRGBEncoding
-    material.needsUpdate = true
-    pauseButtonMesh = new THREE.Mesh(geometry, material)
-    pauseButtonMesh.renderOrder = 1
-    pauseButtonMesh.name = 'pauseButton'
-    pauseButtonMesh.visible = false
-
-    pauseButton.add(pauseButtonMesh)
-
-    scene.add(pauseButton)
-
-    playerControls = addPlayerControls(title, reference.current.duration)
-    scene.add(playerControls)
-
-    clickableObjects.push(pauseButtonMesh, playerControls)
-
-    const cursorGeometry = new THREE.RingGeometry(
-      0.01,
-      0.05,
-      32,
-      0,
-      Math.PI * 0.5,
-      Math.PI * 2
-    )
-    const cursorMaterial = new THREE.MeshBasicMaterial({ color: 0xff55ff })
-    cursor = new THREE.Mesh(cursorGeometry, cursorMaterial)
-    cursor.name = 'cursorButton'
-    cursor.position.z = 0.1
-    cursor.visible = false
-
-    scene.add(cursor)
-    let materialGaze = new THREE.MeshBasicMaterial({
-      map: new THREE.TextureLoader().load(Gaze),
-      transparent: true,
-      depthTest: false,
-      depthWrite: true,
-    })
-
-    let geometryGaze = new THREE.PlaneGeometry(1, 1, 16)
-    gaze = new THREE.Mesh(geometryGaze, materialGaze)
-    gaze.renderOrder = 5
-    gaze.position.z = -1
-    gaze.position.y = 0
-    gaze.visible = false
-
-    scene.add(gaze)
-
-    tweenIn = new TWEEN.Tween(gaze.scale)
-      .to({ x: 0, y: 0 }, 2500)
-      .easing(TWEEN.Easing.Cubic.Out)
-      .onUpdate(() => {
-        if (gaze.scale.x < 0.3) {
-          handleClickVrVideo()
-          gaze.scale.x = 0
-          gaze.scale.y = 0
-          TWEEN.remove(tweenIn)
-        }
-      })
-      .onStart(() => {
-        TWEEN.remove(tweenOut)
-      })
-
-    tweenOut = new TWEEN.Tween(gaze.scale).onStart(() => {
-      TWEEN.remove(tweenIn)
-    })
-
-    orientationControls = new DeviceOrientationControls(camera)
-    //controls.connect();
-    //enterFullscreen();
-
-    //if (document.fullscreenElement) closeFullscreen();
-    orbitControls = new OrbitControls(camera, renderer.domElement)
-
-    orbitControls.target.set(0, 0, -1)
-    orbitControls.enableDamping = true // an animation loop is required when either damping or auto-rotation are enabled
-    orbitControls.enablePan = false
-    orbitControls.dampingFactor = 0.05
-    orbitControls.screenSpacePanning = false
-    orbitControls.minDistance = 0.9
-    orbitControls.maxDistance = 0.9
-    orbitControls.minAzimuthAngle = -Infinity
-    orbitControls.maxAzimuthAngle = Infinity
-    orbitControls.minPolarAngle = 0
-    orbitControls.maxPolarAngle = Math.PI
-
-    if (!is360) {
-      const vrB = VRButton.createButton(
-        renderer,
-        setStoreVrSession,
-        setStoreIsVrSupported
+      // camera
+      camera = new THREE.PerspectiveCamera(
+        80,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        1000
       )
-      vrButtonRef.current = vrB
-      videoContainer.current.appendChild(vrB)
-    }
+      camera.layers.enable(1) // render left view when no stereo available
 
-    window.addEventListener('resize', handleResize)
-    mount.current.addEventListener('click', handleClick)
-    reference.current.addEventListener('loadedmetadata', () => {
-      const object = scene.getObjectByName('totalDurationText')
-      object.text = secondsToHms(reference.current.duration)
-    })
+      // video
+      const video = videoRef.current
+      const texture = new THREE.VideoTexture(video)
 
-    reference.current.addEventListener('ended', () => {
-      reference.current?.pause()
-      reference.current.src = ''
-      reference.current.load()
-      reference.current.remove()
-      callback()
-    })
+      // left
+      const geometry1 = new THREE.SphereGeometry(500, 60, 40)
 
-    animate()
-    return () => {
-      if (vrButtonRef.current && videoContainer.current) {
-        videoContainer.current.removeChild(vrButtonRef.current)
-        vrButtonRef.current = null
-      }
+      // invert the geometry on the x-axis so that all of the faces point inward
+      geometry1.scale(-1, 1, 1)
 
-      window.removeEventListener('resize', handleResize)
-      if (mount.current) {
-        mount.current.removeChild(renderer.domElement)
-        mount.current.removeEventListener('click', handleClick)
-      }
-      if (reference.current) {
-        reference.current.removeEventListener('loadedmetadata', () => {})
-        reference.current.removeEventListener('ended', () => {})
-      }
-      orientationControls.dispose()
-      orbitControls.dispose()
-      renderer.dispose()
+      geometry1.rotateY(-Math.PI / 2)
 
-      scene.traverse((object) => {
-        if (!object.isMesh) return
-
-        object.geometry.dispose()
-
-        if (object.material.isMaterial) {
-          cleanMaterial(object.material)
-        } else {
-          // an array of materials
-          for (const material of object.material) cleanMaterial(material)
-        }
+      material1 = new THREE.MeshBasicMaterial({
+        map: texture,
+        transparent: true,
       })
+
+      const mesh1 = new THREE.Mesh(geometry1, material1)
+      //mesh1.rotation.y = -Math.PI / 2;
+      mesh1.layers.set(1) // display in left eye only
+      scene.add(mesh1)
+
+      // right
+
+      const geometry2 = new THREE.SphereGeometry(500, 60, 40)
+      geometry2.scale(-1, 1, 1)
+      geometry2.rotateY(-Math.PI / 2)
+      material2 = new THREE.MeshBasicMaterial({
+        map: texture,
+        transparent: true,
+      })
+
+      const mesh2 = new THREE.Mesh(geometry2, material2)
+      //mesh2.rotation.y = -Math.PI / 2;
+      mesh2.layers.set(2) // display in right eye only
+      scene.add(mesh2)
+
+      // renderer
+
+      renderer = new THREE.WebGLRenderer({ alpha: true })
+      renderer.setPixelRatio(window.devicePixelRatio)
+      renderer.setSize(window.innerWidth, window.innerHeight)
+      renderer.xr.enabled = true
+      renderer.xr.setReferenceSpaceType('local')
+      renderer.autoClear = true
+      mount.current.appendChild(renderer.domElement)
+
+      pauseButton = new THREE.Group()
+      pauseButton.position.set(0, 0, -1)
+      const geometry = new THREE.PlaneGeometry(0.75, 0.75)
+
+      const textureButton = new THREE.TextureLoader().load(Pause)
+
+      const material = new THREE.MeshBasicMaterial({
+        transparent: true,
+        map: textureButton,
+      })
+      material.map.encoding = THREE.sRGBEncoding
+      material.needsUpdate = true
+      pauseButtonMesh = new THREE.Mesh(geometry, material)
+      pauseButtonMesh.renderOrder = 1
+      pauseButtonMesh.name = 'pauseButton'
+      pauseButtonMesh.visible = false
+
+      pauseButton.add(pauseButtonMesh)
+
+      scene.add(pauseButton)
+
+      playerControls = addPlayerControls(
+        videoData?.title,
+        videoRef.current.duration
+      )
+      scene.add(playerControls)
+
+      clickableObjects.push(pauseButtonMesh, playerControls)
+
+      const cursorGeometry = new THREE.RingGeometry(
+        0.01,
+        0.05,
+        32,
+        0,
+        Math.PI * 0.5,
+        Math.PI * 2
+      )
+      const cursorMaterial = new THREE.MeshBasicMaterial({ color: 0xff55ff })
+      cursor = new THREE.Mesh(cursorGeometry, cursorMaterial)
+      cursor.name = 'cursorButton'
+      cursor.position.z = 0.1
+      cursor.visible = false
+
+      scene.add(cursor)
+      let materialGaze = new THREE.MeshBasicMaterial({
+        map: new THREE.TextureLoader().load(Gaze),
+        transparent: true,
+        depthTest: false,
+        depthWrite: true,
+      })
+
+      let geometryGaze = new THREE.PlaneGeometry(1, 1, 16)
+      gaze = new THREE.Mesh(geometryGaze, materialGaze)
+      gaze.renderOrder = 5
+      gaze.position.z = -1
+      gaze.position.y = 0
+      gaze.visible = false
+
+      scene.add(gaze)
+
+      tweenIn = new TWEEN.Tween(gaze.scale)
+        .to({ x: 0, y: 0 }, 2500)
+        .easing(TWEEN.Easing.Cubic.Out)
+        .onUpdate(() => {
+          if (gaze.scale.x < 0.3) {
+            handleClickVrVideo()
+            gaze.scale.x = 0
+            gaze.scale.y = 0
+            TWEEN.remove(tweenIn)
+          }
+        })
+        .onStart(() => {
+          TWEEN.remove(tweenOut)
+        })
+
+      tweenOut = new TWEEN.Tween(gaze.scale).onStart(() => {
+        TWEEN.remove(tweenIn)
+      })
+
+      orientationControls = new DeviceOrientationControls(camera)
+      //controls.connect();
+      //enterFullscreen();
+
+      //if (document.fullscreenElement) closeFullscreen();
+      orbitControls = new OrbitControls(camera, renderer.domElement)
+
+      orbitControls.target.set(0, 0, -1)
+      orbitControls.enableDamping = true // an animation loop is required when either damping or auto-rotation are enabled
+      orbitControls.enablePan = false
+      orbitControls.dampingFactor = 0.05
+      orbitControls.screenSpacePanning = false
+      orbitControls.minDistance = 0.9
+      orbitControls.maxDistance = 0.9
+      orbitControls.minAzimuthAngle = -Infinity
+      orbitControls.maxAzimuthAngle = Infinity
+      orbitControls.minPolarAngle = 0
+      orbitControls.maxPolarAngle = Math.PI
+
+      if (!is360) {
+        const vrB = VRButton.createButton(
+          renderer,
+          setStoreVrSession,
+          setStoreIsVrSupported
+        )
+        vrButtonRef.current = vrB
+        videoContainer.current.appendChild(vrB)
+      }
+
+      window.addEventListener('resize', handleResize)
+      mount.current.addEventListener('click', handleClick)
+      videoRef.current.addEventListener('loadedmetadata', () => {
+        const object = scene.getObjectByName('totalDurationText')
+        object.text = secondsToHms(videoRef.current.duration)
+      })
+
+      videoRef.current.addEventListener('ended', () => {
+        videoRef.current?.pause()
+        videoRef.current.src = ''
+        videoRef.current.load()
+        videoRef.current.remove()
+        callback()
+      })
+
+      animate()
+      return () => {
+        if (vrButtonRef.current && videoContainer.current) {
+          videoContainer.current.removeChild(vrButtonRef.current)
+          vrButtonRef.current = null
+        }
+
+        window.removeEventListener('resize', handleResize)
+        if (mount.current) {
+          mount.current.removeChild(renderer.domElement)
+          mount.current.removeEventListener('click', handleClick)
+        }
+        if (videoRef.current) {
+          videoRef.current.removeEventListener('loadedmetadata', () => {})
+          videoRef.current.removeEventListener('ended', () => {})
+        }
+        orientationControls.dispose()
+        orbitControls.dispose()
+        renderer.dispose()
+
+        scene.traverse((object) => {
+          if (!object.isMesh) return
+
+          object.geometry.dispose()
+
+          if (object.material.isMaterial) {
+            cleanMaterial(object.material)
+          } else {
+            // an array of materials
+            for (const material of object.material) cleanMaterial(material)
+          }
+        })
+      }
+    } else {
+      videoRef.current.pause()
+      videoRef.current.currentTime = 0
     }
-  }, [])
+  }, [showPlayer, videoData])
 
   const cleanMaterial = (material) => {
     material.dispose()
@@ -561,21 +583,21 @@ const VideoPlayer = ({ callback, title, reference }) => {
   }
 
   const pauseVideo = () => {
-    reference.current.pause()
+    videoRef.current.pause()
     setShowControls(true)
     setIsPlaying(false)
   }
 
   const toggleAudioVideo = () => {
-    reference.current.muted = !muted
-    if (reference.current.muted) {
-      // reference.current.volume = 0;
+    videoRef.current.muted = !muted
+    if (videoRef.current.muted) {
+      // videoRef.current.volume = 0;
       // setVolume(0);
     } else {
-      // reference.current.volume = 1;
+      // videoRef.current.volume = 1;
       // setVolume(100);
     }
-    setMuted(reference.current.muted)
+    setMuted(videoRef.current.muted)
   }
 
   const positionPlayerControls = () => {
@@ -596,9 +618,9 @@ const VideoPlayer = ({ callback, title, reference }) => {
     setShowControls(false)
     setIsFirtsPlay(false)
     setIsPlaying(true)
-    if (reference.current.paused) reference.current.play()
+    if (videoRef.current.paused) videoRef.current.play()
     // setTimeout(() => {
-    //   reference.current.play();
+    //   videoRef.current.play();
     // }, 500);
   }
 
@@ -638,11 +660,11 @@ const VideoPlayer = ({ callback, title, reference }) => {
 
   const seekAudio = (value) => {
     if (value === 0) {
-      reference.current.currentTime = 0
+      videoRef.current.currentTime = 0
       return
     }
-    reference.current.currentTime = (value * reference.current.duration) / 100
-    setVideoProgress(reference.current.currentTime)
+    videoRef.current.currentTime = (value * videoRef.current.duration) / 100
+    setVideoProgress(videoRef.current.currentTime)
   }
 
   /** PLAYER VR FUNCTIONS */
@@ -661,26 +683,26 @@ const VideoPlayer = ({ callback, title, reference }) => {
     switch (action) {
       case 'pause':
         updatePlayerControls = false
-        reference.current.pause()
+        videoRef.current.pause()
         material1.opacity = 0.05
         material1.needsUpdate = true
         material2.opacity = 0.05
         material2.needsUpdate = true
         // eslint-disable-next-line no-case-declarations
         const object = scene.getObjectByName('actualTimeVideo')
-        object.text = secondsToHms(reference.current.currentTime)
+        object.text = secondsToHms(videoRef.current.currentTime)
 
         // eslint-disable-next-line no-case-declarations
         const playerHead = scene.getObjectByName('playerHead')
         playerHead.position.x =
-          -2 + 4 * (reference.current.currentTime / reference.current.duration)
+          -2 + 4 * (videoRef.current.currentTime / videoRef.current.duration)
 
         // eslint-disable-next-line no-case-declarations
         const barBack = scene.getObjectByName('barBackCopy')
         barBack.scale.x =
-          1 - reference.current.currentTime / reference.current.duration
+          1 - videoRef.current.currentTime / videoRef.current.duration
         barBack.position.x =
-          (4 * reference.current.currentTime) / reference.current.duration / 2 -
+          (4 * videoRef.current.currentTime) / videoRef.current.duration / 2 -
           0.07
 
         pauseButton.visible = false
@@ -695,11 +717,11 @@ const VideoPlayer = ({ callback, title, reference }) => {
         material2.needsUpdate = true
         playerControls.visible = false
         pauseButton.visible = true
-        reference.current.play()
+        videoRef.current.play()
         break
 
       case 'exitVideo':
-        reference.current.currentTime = 0
+        videoRef.current.currentTime = 0
         vrButtonRef.current.click()
         callback()
         break
@@ -708,7 +730,7 @@ const VideoPlayer = ({ callback, title, reference }) => {
         const percent = percentajeBarClickRef.current
         // eslint-disable-next-line no-case-declarations
         const ob = scene.getObjectByName('actualTimeVideo')
-        ob.text = secondsToHms(reference.current.duration * percent)
+        ob.text = secondsToHms(videoRef.current.duration * percent)
 
         // eslint-disable-next-line no-case-declarations
         const playerH = scene.getObjectByName('playerHead')
@@ -719,154 +741,167 @@ const VideoPlayer = ({ callback, title, reference }) => {
         barBack2.scale.x = 1 - percent
         barBack2.position.x = (4 * percent) / 2 - 0.07
 
-        reference.current.currentTime = reference.current.duration * percent
+        videoRef.current.currentTime = videoRef.current.duration * percent
 
         break
     }
   }
 
   return (
-    <div
-      ref={videoContainer}
-      className="bg-black h-screen"
-      //className="absolute"
-      // style={{
-      //   backgroundColor: "#000000",
-      //   width: windowDimensions.width,
-      //   height: windowDimensions.height,
-      // }}
-    >
-      {showControls && (
-        <VideoControls
-          playVideo={playVideo}
-          pauseVideo={pauseVideo}
-          title={title}
-          mediaDuration={reference.current.duration}
-          progress={videoProgress}
-          seekAudio={seekAudio}
-          callback={callback}
-          isFirstPlay={isFirstPlay}
-          isPlaying={isPlaying}
-        />
-      )}
-      <div
-        className="vis cursor-grab"
-        ref={mount}
-        style={{ position: 'fixed', top: 0, right: 0, bottom: 0, left: 0 }}
-      />
-      {!showControls && (
-        <>
-          {!isMobile() && (
+    <>
+      <video
+        ref={videoRef}
+        id="video"
+        crossOrigin="anonymous"
+        playsInline
+        style={{ display: 'none' }}
+      >
+        <source />
+      </video>
+      {showPlayer && (
+        <div
+          ref={videoContainer}
+          className="bg-black h-screen"
+          //className="absolute"
+          // style={{
+          //   backgroundColor: "#000000",
+          //   width: windowDimensions.width,
+          //   height: windowDimensions.height,
+          // }}
+        >
+          {showControls && (
+            <VideoControls
+              playVideo={playVideo}
+              pauseVideo={pauseVideo}
+              title={videoData?.title}
+              mediaDuration={videoRef.current.duration}
+              progress={videoProgress}
+              seekAudio={seekAudio}
+              callback={callback}
+              isFirstPlay={isFirstPlay}
+              isPlaying={isPlaying}
+            />
+          )}
+          <div
+            className="vis cursor-grab"
+            ref={mount}
+            style={{ position: 'fixed', top: 0, right: 0, bottom: 0, left: 0 }}
+          />
+          {!showControls && (
             <>
-              <button
-                className="absolute bottom-0 left-0 p-2"
-                onClick={() => {
-                  pauseVideo()
-                }}
-              >
-                <img src={Pause} alt="Pause video" width="50" />
-              </button>
-              <button
-                className="absolute bottom-0 left-[55px] p-2"
-                onClick={(event) => {
-                  if (event.target.type === 'range') return
-                  toggleAudioVideo()
-                }}
-                onMouseEnter={() => {
-                  // if (event.target.type === 'range') return;
-                  volumeRange.current.classList.remove('hidden')
-                  clearInterval(intervalVolumeRef.current)
-                  intervalVolumeRef.current = null
-                }}
-                onMouseLeave={() => {
-                  //   // if (event.target.type === 'range') return;
-                  volumeRange.current.classList.add('hidden')
-                  // clearInterval(intervalVolumeRef.current);
-                  //   intervalVolumeRef.current = null;
-                }}
-              >
-                <img
-                  src={volume !== 0 && !muted ? VolumeOn : VolumeOff}
-                  alt="Mute video"
-                  width="50"
-                />
-                <div
-                  className="bg-black/50 rounded-full py-3 px-3 items-center justify-center absolute bottom-[120px] left-[-43px] -rotate-90 hidden"
-                  ref={volumeRange}
-                >
-                  <div className="absolute top-[18px] left-[16px] w-[80%] h-1 bg-white/30 z-0"></div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="99"
-                    className="relative z-1 cursor-pointer appearance-none rounded-full bg-white/0 [&::-webkit-slider-runnable-track]:rounded-full [&::-webkit-slider-runnable-track]:bg-transparent [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-[15px] [&::-webkit-slider-thumb]:w-[15px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white"
-                    // className="appearance-none [&::-webkit-slider-runnable-track]:rounded-full [&::-webkit-slider-runnable-track]:bg-black/25 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-[50px] [&::-webkit-slider-thumb]:w-[50px] [&::-webkit-slider-thumb]:rounded-full "
-                    value={muted ? 0 : volume}
-                    onChange={(event) => {
-                      let vol = Number(event.target.value)
-                      setVolume(vol)
-                      event.target.value = volume
-                      reference.current.volume = volume / 100
-                      startVolumeInterval()
-
-                      if (volume < 3) {
-                        setMuted(true)
-                        reference.current.volue = 0
-                        reference.current.muted = true
-                      } else {
-                        setMuted(false)
-                        reference.current.muted = false
-                      }
+              {!isMobile() && (
+                <>
+                  <button
+                    className="absolute bottom-0 left-0 p-2"
+                    onClick={() => {
+                      pauseVideo()
                     }}
-                  />
-                </div>
-              </button>
+                  >
+                    <img src={Pause} alt="Pause video" width="50" />
+                  </button>
+                  <button
+                    className="absolute bottom-0 left-[55px] p-2"
+                    onClick={(event) => {
+                      if (event.target.type === 'range') return
+                      toggleAudioVideo()
+                    }}
+                    onMouseEnter={() => {
+                      // if (event.target.type === 'range') return;
+                      volumeRange.current.classList.remove('hidden')
+                      clearInterval(intervalVolumeRef.current)
+                      intervalVolumeRef.current = null
+                    }}
+                    onMouseLeave={() => {
+                      //   // if (event.target.type === 'range') return;
+                      volumeRange.current.classList.add('hidden')
+                      // clearInterval(intervalVolumeRef.current);
+                      //   intervalVolumeRef.current = null;
+                    }}
+                  >
+                    <img
+                      src={volume !== 0 && !muted ? VolumeOn : VolumeOff}
+                      alt="Mute video"
+                      width="50"
+                    />
+                    <div
+                      className="bg-black/50 rounded-full py-3 px-3 items-center justify-center absolute bottom-[120px] left-[-43px] -rotate-90 hidden"
+                      ref={volumeRange}
+                    >
+                      <div className="absolute top-[18px] left-[16px] w-[80%] h-1 bg-white/30 z-0"></div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="99"
+                        className="relative z-1 cursor-pointer appearance-none rounded-full bg-white/0 [&::-webkit-slider-runnable-track]:rounded-full [&::-webkit-slider-runnable-track]:bg-transparent [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-[15px] [&::-webkit-slider-thumb]:w-[15px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white"
+                        // className="appearance-none [&::-webkit-slider-runnable-track]:rounded-full [&::-webkit-slider-runnable-track]:bg-black/25 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-[50px] [&::-webkit-slider-thumb]:w-[50px] [&::-webkit-slider-thumb]:rounded-full "
+                        value={muted ? 0 : volume}
+                        onChange={(event) => {
+                          let vol = Number(event.target.value)
+                          setVolume(vol)
+                          event.target.value = volume
+                          videoRef.current.volume = volume / 100
+                          startVolumeInterval()
+
+                          if (volume < 3) {
+                            setMuted(true)
+                            videoRef.current.volue = 0
+                            videoRef.current.muted = true
+                          } else {
+                            setMuted(false)
+                            videoRef.current.muted = false
+                          }
+                        }}
+                      />
+                    </div>
+                  </button>
+                </>
+              )}
+              <div className="absolute bottom-0 right-2 p-2 bg-black bg-opacity-20 rounded-lg">
+                {isMobile() && !isMobileVRBrowser() && (
+                  <button
+                    className="m-4"
+                    onClick={() => {
+                      if (
+                        isIOSFunction() &&
+                        typeof window.DeviceMotionEvent.requestPermission ===
+                          'function'
+                      ) {
+                        window.DeviceMotionEvent.requestPermission()
+                          .then((permissionState) => {
+                            if (permissionState === 'granted') {
+                              console.log('Granted reload')
+                              //window.location.reload(false);
+                            }
+                          })
+                          .catch(console.error)
+                      }
+
+                      setIs360(!is360)
+                    }}
+                    //setIs360(!is360);
+                  >
+                    {/* <img src={Enter360Icon} alt="Pause video" width="30" /> */}
+                    <Enter360Icon is360Mode={is360} />
+                  </button>
+                )}
+
+                {!isIOSFunction() && !isSafari() && (
+                  <button
+                    onClick={() => {
+                      enterFullscreen()
+                    }}
+                  >
+                    {/* <img src={EnterFullScreen} alt="Pause video" width="30" /> */}
+                    <EnterFullScreenIcon isFullScreenMode={isFullScreenMode} />
+                  </button>
+                )}
+              </div>
             </>
           )}
-          <div className="absolute bottom-0 right-2 p-2 bg-black bg-opacity-20 rounded-lg">
-            {isMobile() && !isMobileVRBrowser() && (
-              <button
-                className="m-4"
-                onClick={() => {
-                  if (
-                    isIOSFunction() &&
-                    typeof window.DeviceMotionEvent.requestPermission ===
-                      'function'
-                  ) {
-                    window.DeviceMotionEvent.requestPermission()
-                      .then((permissionState) => {
-                        if (permissionState === 'granted') {
-                          console.log('Granted reload')
-                          //window.location.reload(false);
-                        }
-                      })
-                      .catch(console.error)
-                  }
-
-                  setIs360(!is360)
-                }}
-                //setIs360(!is360);
-              >
-                {/* <img src={Enter360Icon} alt="Pause video" width="30" /> */}
-                <Enter360Icon is360Mode={is360} />
-              </button>
-            )}
-
-            {!isIOSFunction() && !isSafari() && (
-              <button
-                onClick={() => {
-                  enterFullscreen()
-                }}
-              >
-                {/* <img src={EnterFullScreen} alt="Pause video" width="30" /> */}
-                <EnterFullScreenIcon isFullScreenMode={isFullScreenMode} />
-              </button>
-            )}
-          </div>
-        </>
+        </div>
       )}
-    </div>
+    </>
   )
 }
 
-export default VideoPlayer
+export default VRPlayer
